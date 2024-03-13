@@ -1,0 +1,59 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  gope-lambda-image
+
+  Sample SAM Template for gope-lambda-image
+Globals:
+  Function:
+    Timeout: 20
+    MemorySize: 128
+
+    LoggingConfig:
+      LogFormat: JSON
+Resources:
+  ImageBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: tour-stack-bucket1
+  TourGateway: # Este es el nombre del recurso existente
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: dev
+      Cors:
+        AllowMethods: "'POST,GET,PUT,DELETE,OPTIONS'"
+        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+        AllowOrigin: "'*'"
+
+  UploadImageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: UploadImageFunction
+      Handler: com.gope.image.infrastructure.handler.UploadImageHandler
+      Runtime: java11
+      Policies:
+        - S3WritePolicy: # Permisos para escribir en S3
+            BucketName: !Ref ImageBucket # Referencia al bucket creado
+      Architectures:
+        - x86_64
+      MemorySize: 512
+      Environment:
+        Variables:
+          BUCKET_NAME: !Ref ImageBucket # Proporciona el nombre del bucket como variable de entorno
+          JAVA_TOOL_OPTIONS: -XX:+TieredCompilation -XX:TieredStopAtLevel=1
+      Events:
+        ImageUpload:
+          Type: Api
+          Properties:
+            RestApiId: !Ref TourGateway
+            Path: /image/upload-image # Endpoint para la carga de imágenes
+            Method: post
+Outputs:
+  UploadImageFunctionArn:
+    Description: ARN de la función UploadImageFunction
+    Value: !GetAtt UploadImageFunction.Arn
+
+  TourApi:
+    Description: URL de la API TourApi
+    Value: !Sub "https://${TourGateway}.execute-api.${AWS::Region}.amazonaws.com/dev"
+
